@@ -11,6 +11,7 @@ func main() {
 		nextURL:     "https://pokeapi.co/api/v2/location-area/",
 		previousURL: "",
 		cache:       pokecache.NewCache(5 * time.Minute),
+		pokedex:     make(map[string]Pokemon),
 	}
 
 	startRepl(cfg)
