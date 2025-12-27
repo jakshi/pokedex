@@ -23,6 +23,7 @@ type Pokemon struct {
 	Height         int
 	Weight         int
 	Types          []string
+	Stats          map[string]int // e.g. {"hp": 35, "attack": 55, ...}
 }
 
 type config struct {
@@ -245,6 +246,12 @@ func commandCatch(c *config, args []string) error {
 				Name string `json:"name"`
 			} `json:"type"`
 		} `json:"types"`
+		Stats []struct {
+			BaseStat int `json:"base_stat"`
+			Stat     struct {
+				Name string `json:"name"`
+			} `json:"stat"`
+		} `json:"stats"`
 	}
 	err := json.Unmarshal(body, &pokemonData)
 	if err != nil {
@@ -265,12 +272,19 @@ func commandCatch(c *config, args []string) error {
 			types = append(types, t.Type.Name)
 		}
 
+		// Build stats map
+		stats := make(map[string]int)
+		for _, s := range pokemonData.Stats {
+			stats[s.Stat.Name] = s.BaseStat
+		}
+
 		c.pokedex[pokemonData.Name] = Pokemon{
 			Name:           pokemonData.Name,
 			BaseExperience: pokemonData.BaseExperience,
 			Height:         pokemonData.Height,
 			Weight:         pokemonData.Weight,
 			Types:          types,
+			Stats:          stats,
 		}
 	} else {
 		fmt.Printf("%s  escaped!\n", pokemonData.Name)
@@ -296,6 +310,30 @@ func catchChance(baseExperience int) float64 {
 		return maxChance
 	}
 	return chance
+}
+
+func commandInspect(c *config, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("please provide a Pokemon name: inspect <pokemon-name>")
+	}
+	pokemonName := args[0]
+
+	pokemon, ok := c.pokedex[pokemonName]
+	if !ok {
+		return fmt.Errorf("you have not caught %s yet", pokemonName)
+	}
+
+	fmt.Printf("Name: %s\n", pokemon.Name)
+	fmt.Printf("Base Experience: %d\n", pokemon.BaseExperience)
+	fmt.Printf("Height: %d\n", pokemon.Height)
+	fmt.Printf("Weight: %d\n", pokemon.Weight)
+	fmt.Printf("Types: %s\n", pokemon.Types)
+	fmt.Println("Stats:")
+	for statName, statValue := range pokemon.Stats {
+		fmt.Printf("  - %s: %d\n", statName, statValue)
+	}
+
+	return nil
 }
 
 var commands map[string]cliCommand
@@ -331,6 +369,26 @@ func init() {
 			name:        "catch",
 			description: "takes the name of a Pokemon as an argument. Give the user a chance to catch the Pokemon. Once the Pokemon is caught, add it to the user's Pokedex.",
 			callback:    commandCatch,
+		},
+		"inspect": cliCommand{
+			name:        "inspect",
+			description: "takes the name of a caught Pokemon as an argument. Displays detailed information about the Pokemon from the user's Pokedex.",
+			callback:    commandInspect,
+		},
+		"pokedex": cliCommand{
+			name:        "pokedex",
+			description: "Displays the names of all the Pokemon caught by the user.",
+			callback: func(c *config, args []string) error {
+				if len(c.pokedex) == 0 {
+					fmt.Println("Your Pokedex is empty. Catch some Pokemon!")
+					return nil
+				}
+				fmt.Println("Your Pokedex contains:")
+				for name := range c.pokedex {
+					fmt.Printf("  - %s\n", name)
+				}
+				return nil
+			},
 		},
 	}
 }
